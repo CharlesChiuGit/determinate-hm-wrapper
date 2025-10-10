@@ -1,6 +1,7 @@
 # determinate-hm-wrapper
 
-> warning: This a hot-glue solution to utilize Determinate Nix features, like
+> [!WARNING]
+> This a hot-glue solution to utilize Determinate Nix features, like
 > `lazy-trees` and `eval-cores` to standalone hom-manager on
 > non-NixOS/non-nix-darwin, this does not fully tested on every Distros and does
 > not guarantee Determinate Nix's features are properly utilized.
@@ -48,6 +49,8 @@ A minimal overlay + Home Manager (HM) module that makes **non-NixOS / non-nix-da
 
 Add this repo as a flake input in your **home-manager config's** flake:
 
+`flake.nix`:
+
 ```nix
 {
   inputs = {
@@ -69,7 +72,7 @@ Add this repo as a flake input in your **home-manager config's** flake:
       ];
     };
   in {
-    homeConfigurations."user@host" = home-manager.lib.homeManagerConfiguration {
+    homeConfigurations."username@host" = home-manager.lib.homeManagerConfiguration {
       inherit pkgs;
       modules = [
         determinate-hm-wrapper.homeManagerModules.default
@@ -78,4 +81,66 @@ Add this repo as a flake input in your **home-manager config's** flake:
     };
   };
 }
+```
+
+`home.nix`:
+
+```nix
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
+{
+  nix = {
+    package = pkgs.nix-ds; # <-- NOTE: replace `pkgs.nix` with `pkgs.nix-ds`
+    checkConfig = true;
+    settings = {
+      experimental-features = [
+        "nix-command"
+        "flakes"
+      ];
+      use-xdg-base-directories = true;
+      cores = 0;
+      max-jobs = 10;
+      auto-optimise-store = true;
+      warn-dirty = false;
+      http-connections = 50;
+      trusted-users = "username";
+    };
+    gc = {
+      automatic = true;
+      options = "--delete-older-than 7d --max-freed $((1 * 1024**3))";
+    };
+  };
+  ...
+}
+
+```
+
+`/etc/nix/nix.custom.conf`:
+
+```conf
+# Written by https://github.com/DeterminateSystems/nix-installer.
+# The contents below are based on options specified at installation time.
+
+trusted-users = your_name
+lazy-trees = true
+eval-cores = 0
+```
+
+Then restart nix daemon:
+
+on macOS:
+
+```sh
+sudo launchctl unload /Library/LaunchDaemons/systems.determinate.nix-daemon.plist
+sudo launchctl load /Library/LaunchDaemons/systems.determinate.nix-daemon.plist
+```
+
+on Ubuntu:
+
+```sh
+sudo systemctl restart nix-daemon
 ```
