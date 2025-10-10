@@ -65,14 +65,14 @@ Add this repo as a flake input in your **home-manager config's** flake:
     pkgs = import nixpkgs {
       inherit system;
       overlays = [
-        determinate-hm-wrapper.overlays.default
+        determinate-hm-wrapper.overlays.default # recommanded
       ];
     };
   in {
     homeConfigurations."username@host" = home-manager.lib.homeManagerConfiguration {
       inherit pkgs;
       modules = [
-        determinate-hm-wrapper.homeManagerModules.default
+        determinate-hm-wrapper.homeManagerModules.default # optional, it might conflicted with other modules
         # ...your existing HM modules...
       ];
     };
