@@ -141,3 +141,9 @@ on Ubuntu:
 ```sh
 sudo systemctl restart nix-daemon
 ```
+
+---
+
+## My example config for using this wrapper
+
+- [CharlesChiuGit/nix-hm-config](https://github.com/CharlesChiuGit/nix-hm-config)
