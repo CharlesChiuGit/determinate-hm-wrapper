@@ -1,10 +1,7 @@
 # determinate-hm-wrapper
 
 > [!WARNING]
-> This a hot-glue solution to utilize Determinate Nix features, like
-> `lazy-trees` and `eval-cores` to standalone hom-manager on
-> non-NixOS/non-nix-darwin, this does not fully tested on every Distros and does
-> not guarantee Determinate Nix's features are properly utilized.
+> This is a stopgap approach for enabling Determinate Nix features (e.g., `lazy-trees`, `eval-cores`) with standalone Home Manager on non-NixOS/non-nix-darwin systems. It is not fully tested across distributions and does not guarantee proper utilization of those features.
 
 A minimal overlay + Home Manager (HM) module that makes **non-NixOS / non-nix-darwin** hosts use the **system-level Determinate Nix** binaries during Home Manager evaluation and activation — **without** pulling the original `nix` from `nixpkgs`.
 
