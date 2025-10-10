@@ -1,0 +1,31 @@
+---
+name: update-flake-lock-ds
+on:
+  workflow_dispatch: # allows manual triggering
+  schedule:
+    - cron: 0 0 * * 0 # runs weekly on Sunday at 00:00
+jobs:
+  nix-flake-update:
+    permissions:
+      contents: write
+      id-token: write
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Install Nix
+        uses: DeterminateSystems/determinate-nix-action@v3
+      - name: Use nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+      - name: Check Nix flake inputs
+        uses: DeterminateSystems/flake-checker-action@v12
+        with:
+          ignore-missing-flake-lock: false
+          fail-mode: true
+      - name: Update flake.lock
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: DeterminateSystems/update-flake-lock@v27
+        with:
+          inputs: nixpkgs nix-filter
