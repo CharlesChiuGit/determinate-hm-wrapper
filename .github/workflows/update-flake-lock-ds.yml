@@ -22,18 +22,18 @@ jobs:
         with:
           ignore-missing-flake-lock: false
           fail-mode: true
-      # - name: Update flake.lock
-      #   if: ${{ github.event_name != 'pull_request' }}
-      #   uses: DeterminateSystems/update-flake-lock@v27
-      #   with:
-      #     inputs: nixpkgs nix-filter
-      - name: Run flake-update
-        run: |
-          nix flake update
-      - uses: stefanzweifel/git-auto-commit-action@v6
+      - name: Update flake.lock
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: DeterminateSystems/update-flake-lock@v27
         with:
-          commit_message: "chore(lockfile): auto update flake.lock"
-          commit_user_name: "github-actions[bot]"
-          commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
-          commit_author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
-          file_pattern: "flake.lock"
+          inputs: nixpkgs nix-filter
+      # - name: Run flake-update
+      #   run: |
+      #     nix flake update
+      # - uses: stefanzweifel/git-auto-commit-action@v6
+      #   with:
+      #     commit_message: "chore(lockfile): auto update flake.lock"
+      #     commit_user_name: "github-actions[bot]"
+      #     commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+      #     commit_author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+      #     file_pattern: "flake.lock"
