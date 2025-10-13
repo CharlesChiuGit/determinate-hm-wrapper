@@ -5,11 +5,11 @@
 
 A minimal overlay + Home Manager (HM) module that makes **non-NixOS / non-nix-darwin** hosts use the **system-level Determinate Nix** binaries during Home Manager evaluation and activation — **without** pulling the original `nix` from `nixpkgs`.
 
-- ✅ Satisfies HM’s `nix.package` assertion (via a small wrapper package)
-- ✅ Calls the system Determinate Nix at `/nix/var/nix/profiles/default/bin/*`
-- ✅ Provides legacy subcommands (`nix-build`, `nix-env`, etc.) as wrappers to avoid activation errors
-- ✅ Keeps Determinate-specific settings (e.g., `lazy-trees`, `eval-cores`) in **system config**, not HM
-- ✅ Ships with `nix-filter` to keep the flake source minimal and reproducible
+-  Satisfies HM’s `nix.package` assertion (via a small wrapper package)
+-  Calls the system Determinate Nix at `/nix/var/nix/profiles/default/bin/*`
+-  Provides legacy subcommands (`nix-build`, `nix-env`, etc.) as wrappers to avoid activation errors
+-  Keeps Determinate-specific settings (e.g., `lazy-trees`, `eval-cores`) in **system config**, not HM
+-  Ships with `nix-filter` to keep the flake source minimal and reproducible
 
 > Target audience: users running **Home Manager standalone** on Linux or macOS, with **Determinate Nix installed via the official installer**, but **not** using NixOS or nix-darwin.
 
