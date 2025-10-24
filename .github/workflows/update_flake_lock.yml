@@ -1,9 +1,17 @@
 ---
-name: "Flake.lock: update Nix dependencies"
+name: "Flake.lock: update Nix dependencies (Verified)"
 on:
   workflow_dispatch: # allows manual triggering
   schedule:
     - cron: 0 0 * * 0 # runs weekly on Sunday at 00:00
+
+env:
+  BRANCH: "main"
+  FILES_TO_COMMIT: "flake.lock"     # multi files: "flake.lock, another/file.txt"
+  COMMIT_HEADLINE: "chore(lockfile): auto update flake.lock"
+  GIT_NAME: "github-actions[bot]"
+  GIT_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
+
 jobs:
   nix-flake-update:
     permissions:
@@ -13,20 +21,112 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
+
       - name: Check Nix flake inputs
         uses: DeterminateSystems/flake-checker-action@v12
         with:
           ignore-missing-flake-lock: false
           fail-mode: true
+
       - name: Update flake.lock
         run: |
           nix flake update
-      - uses: stefanzweifel/git-auto-commit-action@v7
+
+      - name: Detect changes
+        id: diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=$(echo "${FILES_TO_COMMIT}" | tr ',' ' ')
+          git add -N $files || true
+          if git diff --quiet -- $files; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit via GraphQL createCommitOnBranch (Verified)
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/github-script@v7
         with:
-          commit_message: "chore(lockfile): auto update flake.lock"
-          commit_user_name: "github-actions[bot]"
-          commit_user_email: "32497323+github-actions[bot]@users.noreply.github.com"
-          commit_author: "github-actions[bot] <32497323+github-actions[bot]@users.noreply.github.com>"
-          file_pattern: "flake.lock"
+          script: |
+            const fs = require('fs');
+
+            // ── read env vars ────────────────────────────────────────────────
+            const branchName = process.env.BRANCH;
+            const headline   = process.env.COMMIT_HEADLINE;
+            const gitName    = process.env.GIT_NAME;
+            const gitEmail   = process.env.GIT_EMAIL;
+
+            // files list: comma-separated → trimmed array
+            const filesToCommit = process.env.FILES_TO_COMMIT
+              .split(',')
+              .map(s => s.trim())
+              .filter(Boolean);
+
+            if (filesToCommit.length === 0) {
+              core.setFailed('FILES_TO_COMMIT is empty');
+              return;
+            }
+
+            // ── build file additions (base64) ───────────────────────────────
+            const additions = filesToCommit.map(p => ({
+              path: p,
+              contents: fs.readFileSync(p).toString('base64'),
+            }));
+
+            // ── resolve branch head oid ─────────────────────────────────────
+            const owner = context.repo.owner;
+            const name  = context.repo.repo;
+            const qualifiedName = `refs/heads/${branchName}`;
+
+            const q = `
+              query($owner: String!, $name: String!, $qualifiedName: String!) {
+                repository(owner: $owner, name: $name) {
+                  ref(qualifiedName: $qualifiedName) {
+                    target { ... on Commit { oid } }
+                  }
+                }
+              }`;
+
+            const { repository } = await github.graphql(q, { owner, name, qualifiedName });
+            const headOid = repository?.ref?.target?.oid;
+            if (!headOid) {
+              core.setFailed(`Cannot resolve ${qualifiedName} OID`);
+              return;
+            }
+
+            // ── create commit on branch (Verified) ──────────────────────────
+            const m = `
+              mutation($input: CreateCommitOnBranchInput!) {
+                createCommitOnBranch(input: $input) {
+                  commit { oid url messageHeadline committedDate }
+                }
+              }`;
+
+            const input = {
+              branch: {
+                repositoryNameWithOwner: `${owner}/${name}`,
+                branchName
+              },
+              message: { headline },
+              expectedHeadOid: headOid,
+              fileChanges: { additions },
+              author:    { name: gitName, email: gitEmail },
+              committer: { name: gitName, email: gitEmail }
+            };
+
+            const result = await github.graphql(m, { input });
+            core.info(`Committed: ${result.createCommitOnBranch.commit.oid}`);
+            core.info(`URL: ${result.createCommitOnBranch.commit.url}`);
+
+      # - uses: stefanzweifel/git-auto-commit-action@v7
+      #   with:
+      #     commit_message: "chore(lockfile): auto update flake.lock"
+      #     commit_user_name: "github-actions[bot]"
+      #     commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+      #     commit_author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+      #     file_pattern: "flake.lock"
