@@ -61,7 +61,7 @@ jobs:
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "changed_files=${changed_csv}" >> "$GITHUB_OUTPUT"
 
-      - name: Commit via Git Database API (server-side signed → Verified)
+      - name: Commit via REST Contents API (server-signed → Verified)
         if: steps.diff.outputs.changed == 'true'
         uses: actions/github-script@v8
         env:
@@ -69,8 +69,6 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-
-            // --- Inputs / env ---
             const owner   = context.repo.owner;
             const repo    = context.repo.repo;
             const branch  = process.env.BRANCH;
@@ -78,92 +76,34 @@ jobs:
             const name    = process.env.GIT_NAME;
             const email   = process.env.GIT_EMAIL;
 
-            // Parse changed files (comma-separated)
-            const changedCsv = process.env.CHANGED_FILES || '';
-            const files = changedCsv.split(',').map(s => s.trim()).filter(Boolean);
-            if (files.length === 0) {
-              core.info('No changed files to commit.');
-              return;
-            }
+            const files = (process.env.CHANGED_FILES || '')
+              .split(',')
+              .map(s => s.trim())
+              .filter(Boolean);
 
-            // 1) Resolve current HEAD of the target branch
-            const refResp = await github.rest.git.getRef({
-              owner, repo, ref: `heads/${branch}`
-            });
-            const headSha = refResp.data.object.sha;
-            core.info(`Current ${branch} head: ${headSha}`);
-
-            // 2) Get base tree from the head commit
-            const headCommit = await github.rest.git.getCommit({
-              owner, repo, commit_sha: headSha
-            });
-            const baseTreeSha = headCommit.data.tree.sha;
-            core.info(`Base tree: ${baseTreeSha}`);
-
-            // 3) Create blobs for each changed file
-            const treeEntries = [];
             for (const path of files) {
-              core.info(`Creating blob for: ${path}`);
-              // Read file as base64; Git DB API expects raw content + encoding flag.
-              const contentB64 = fs.readFileSync(path, { encoding: 'base64' });
-              const blob = await github.rest.git.createBlob({
-                owner, repo,
-                content: contentB64,
-                encoding: 'base64'
+              const content = fs.readFileSync(path, { encoding: 'base64' });
+
+              // Get existing sha if the file already exists
+              let sha;
+              try {
+                const res = await github.rest.repos.getContent({ owner, repo, path, ref: branch });
+                if (!Array.isArray(res.data)) sha = res.data.sha;
+              } catch (e) {
+                if (e.status !== 404) throw e;
+              }
+
+              // Server-side commit (auto-signed by GitHub → Verified)
+              const r = await github.rest.repos.createOrUpdateFileContents({
+                owner, repo, path, branch,
+                message,
+                content,
+                sha,
+                committer: { name, email },
+                author:    { name, email }
               });
-              treeEntries.push({
-                path,
-                mode: '100644',
-                type: 'blob',
-                sha: blob.data.sha
-              });
+              core.info(`Committed ${path}: ${r.data.commit.sha}`);
             }
-
-            // 4) Create a new tree based on the base tree + our entries
-            const newTree = await github.rest.git.createTree({
-              owner, repo,
-              base_tree: baseTreeSha,
-              tree: treeEntries
-            });
-            const newTreeSha = newTree.data.sha;
-            core.info(`New tree: ${newTreeSha}`);
-
-            // 5) Create a commit with the new tree
-            const commitResp = await github.rest.git.createCommit({
-              owner, repo,
-              message,
-              tree: newTreeSha,
-              parents: [headSha],
-              author:    { name, email },
-              committer: { name, email }
-            });
-            const newCommitSha = commitResp.data.sha;
-            core.info(`New commit: ${newCommitSha}`);
-
-            // 6) Concurrency guard: ensure branch head has not moved
-            const refNow = await github.rest.git.getRef({
-              owner, repo, ref: `heads/${branch}`
-            });
-            const currentHead = refNow.data.object.sha;
-            if (currentHead !== headSha) {
-              core.setFailed(`Branch '${branch}' moved from ${headSha} to ${currentHead} during update. Aborting to avoid losing commits.`);
-              return;
-            }
-
-            // 7) Update branch ref to the new commit (non-forced)
-            await github.rest.git.updateRef({
-              owner, repo,
-              ref: `heads/${branch}`,
-              sha: newCommitSha,
-              force: false
-            });
-            core.info(`Updated ${branch} → ${newCommitSha}`);
-
-            // 8) Link to the commit in the UI
-            const commitView = await github.rest.repos.getCommit({
-              owner, repo, ref: newCommitSha
-            });
-            core.info(`Commit URL: ${commitView.data.html_url}`);
 
       # - uses: stefanzweifel/git-auto-commit-action@v7
       #   with:
