@@ -73,8 +73,6 @@ jobs:
             const repo    = context.repo.repo;
             const branch  = process.env.BRANCH;
             const message = process.env.COMMIT_MESSAGE;
-            const name    = process.env.GIT_NAME;
-            const email   = process.env.GIT_EMAIL;
 
             const files = (process.env.CHANGED_FILES || '')
               .split(',')
@@ -93,14 +91,12 @@ jobs:
                 if (e.status !== 404) throw e;
               }
 
-              // Server-side commit (auto-signed by GitHub → Verified)
+              // NOTE: author/committer intentionally omitted to allow platform signing
               const r = await github.rest.repos.createOrUpdateFileContents({
                 owner, repo, path, branch,
                 message,
                 content,
-                sha,
-                committer: { name, email },
-                author:    { name, email }
+                sha
               });
               core.info(`Committed ${path}: ${r.data.commit.sha}`);
             }
